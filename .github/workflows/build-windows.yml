@@ -1,25 +1,41 @@
-name: Build Windows app
+name: Build Windows installer
 on:
   push:
     branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
-      - name: Restore
-        run: dotnet restore src/ClothingOrders/ClothingOrders.csproj
-      - name: Build
-        run: dotnet build src/ClothingOrders/ClothingOrders.csproj --configuration Release --no-restore
-      - name: Publish
-        run: dotnet publish src/ClothingOrders/ClothingOrders.csproj --configuration Release --no-build --output publish
-      - uses: actions/upload-artifact@v4
+
+      - name: Publish self-contained Windows app
+        run: dotnet publish src/ClothingOrders/ClothingOrders.csproj --configuration Release --runtime win-x64 --self-contained true --output publish
+
+      - name: Download Microsoft WebView2 Runtime bootstrapper
+        shell: pwsh
+        run: Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/p/?LinkId=2124703" -OutFile "installer/WebView2Setup.exe"
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Setup.exe
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "installer/ClothingOrders.iss"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
         with:
-          name: ClothingOrders-Windows
-          path: publish/**
+          name: ClothingOrders-Setup
+          path: artifacts/ClothingOrders-Setup.exe
+          if-no-files-found: error
