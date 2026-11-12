@@ -9,7 +9,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "מערכת ניהול הזמנות לבוש";
+        Text = "דעת אהרן | מערכת ניהול הזמנות לבוש";
         Width = 1440;
         Height = 940;
         MinimumSize = new Size(1050, 700);
