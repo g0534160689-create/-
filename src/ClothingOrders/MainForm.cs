@@ -32,7 +32,7 @@ public sealed class MainForm : Form
             await _web.EnsureCoreWebView2Async(environment);
             _web.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             _web.CoreWebView2.Settings.IsStatusBarEnabled = false;
-            _web.CoreWebView2.Settings.AreDevToolsEnabled = true;
+            _web.CoreWebView2.Settings.AreDevToolsEnabled = false;
             var page = Path.Combine(AppContext.BaseDirectory, "wwwroot", "index.html");
             if (!File.Exists(page))
                 throw new FileNotFoundException("קובץ הממשק לא נמצא.", page);
