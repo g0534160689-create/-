@@ -8,6 +8,8 @@ public sealed class MainForm : Form
     private readonly WebView2 _web = new() { Dock = DockStyle.Fill };
     private readonly string _dataDirectory;
     private SqliteStore? _store;
+    private TaskCompletionSource<bool>? _pendingSnapshotSave;
+    private bool _allowClose;
 
     public MainForm()
     {
@@ -22,7 +24,57 @@ public sealed class MainForm : Form
             "ClothingOrders");
         Controls.Add(_web);
         Shown += async (_, _) => await InitializeBrowserAsync();
+        FormClosing += HandleFormClosingAsync;
         FormClosed += (_, _) => _store?.Dispose();
+    }
+
+    private async void HandleFormClosingAsync(object? sender, FormClosingEventArgs e)
+    {
+        if (_allowClose) return;
+
+        e.Cancel = true;
+        try
+        {
+            if (_web.CoreWebView2 is not null && _store is not null)
+            {
+                _pendingSnapshotSave = new TaskCompletionSource<bool>(
+                    TaskCreationOptions.RunContinuationsAsynchronously);
+                await _web.CoreWebView2.ExecuteScriptAsync("syncSqliteSnapshot(true)");
+                var completed = await Task.WhenAny(
+                    _pendingSnapshotSave.Task,
+                    Task.Delay(TimeSpan.FromSeconds(3)));
+
+                if (completed != _pendingSnapshotSave.Task)
+                {
+                    var choice = MessageBox.Show(this,
+                        "שמירת הנתונים האחרונה עדיין לא אושרה. האם לצאת בכל זאת? מומלץ לבחור לא ולנסות שוב.",
+                        "המתנה לשמירת נתונים", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                    if (choice != DialogResult.Yes)
+                    {
+                        _pendingSnapshotSave = null;
+                        return;
+                    }
+                }
+                else
+                {
+                    await _pendingSnapshotSave.Task;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            var choice = MessageBox.Show(this,
+                "לא הצלחתי לאשר את שמירת הנתונים האחרונה. האם לצאת בכל זאת?\n\n" + ex.Message,
+                "אזהרת שמירת נתונים", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+            if (choice != DialogResult.Yes)
+            {
+                _pendingSnapshotSave = null;
+                return;
+            }
+        }
+
+        _allowClose = true;
+        BeginInvoke(Close);
     }
 
     private async Task InitializeBrowserAsync()
@@ -81,6 +133,7 @@ public sealed class MainForm : Form
             var json = payload.GetString();
             if (string.IsNullOrWhiteSpace(json) || json.Length > 50_000_000) return;
             _store.SaveSnapshot(json);
+            _pendingSnapshotSave?.TrySetResult(true);
         }
         catch (JsonException)
         {
@@ -88,6 +141,7 @@ public sealed class MainForm : Form
         }
         catch (Microsoft.Data.Sqlite.SqliteException ex)
         {
+            _pendingSnapshotSave?.TrySetException(ex);
             MessageBox.Show(this, "שמירת הנתונים למסד הנתונים נכשלה. מומלץ לייצא גיבוי.\n\n" + ex.Message,
                 "שגיאת שמירה", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
