@@ -2,7 +2,7 @@
 <html lang="he" dir="rtl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>דעת אהרן — מערכת ניהול הזמנות לבוש</title>
+<title>תומכי תורה | ישיבת דעת אהרן</title>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root{--bg:#0b1220;--panel:#121d31;--panel2:#17243b;--line:#263752;--text:#edf3ff;--muted:#8fa2bf;--accent:#70a5ff;--accent2:#8c7cff;--green:#38c99a;--red:#ff7185;--shadow:0 18px 50px #0005}
@@ -14,7 +14,7 @@ main{padding:30px clamp(18px,3vw,48px);max-width:1600px;width:100%;margin:auto}.
 @media(max-width:1050px){.app{grid-template-columns:205px 1fr}.cards{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:repeat(2,1fr)}}@media(max-width:720px){.app{display:block}.side{height:auto;position:relative;padding:13px}.brand{margin:0 4px 12px}.nav{grid-template-columns:repeat(3,1fr)}.nav button{padding:9px;font-size:12px}.side-note{display:none}main{padding:18px}.top{align-items:flex-start;flex-direction:column}.cards{gap:8px}.card{padding:13px}.card strong{font-size:24px}.grid2,.formgrid{grid-template-columns:1fr}.fieldrow{grid-template-columns:1fr 1fr}}
 </style></head>
 <body><div class="app">
-<aside class="side"><div class="brand"><div class="logo">✂</div><div><b>ניהול הזמנות לבוש</b><small>מערכת רישום ומעקב</small></div></div>
+<aside class="side"><div class="brand"><div class="logo">✂</div><div><b>תומכי תורה</b><small>ישיבת דעת אהרן</small></div></div>
 <nav class="nav">
 <button class="active" data-page="dashboard"><span>⌂</span>לוח בקרה</button>
 <button data-page="smart"><span>✦</span>מרכז חכם</button>
@@ -23,7 +23,7 @@ main{padding:30px clamp(18px,3vw,48px);max-width:1600px;width:100%;margin:auto}.
 <button data-page="summary"><span>▥</span>סיכום מוצרים</button>
 <button data-page="settings"><span>⚙</span>הגדרות ושדות</button>
 </nav><div class="side-note">הנתונים נשמרים במחשב זה בלבד.<br>מומלץ לייצא גיבוי באופן קבוע.</div></aside>
-<main><header class="top"><div><div class="eyebrow">WORKSPACE / CLOTHING ORDERS</div><h1 id="pageTitle">לוח בקרה</h1><p id="pageSub">תמונת מצב עדכנית של ההזמנות שלך</p><div class="credit">דעת אהרן בהנהלת הבה״ח יאיר חיימוביץ העושה לילות כימים למען טובת הכלל</div></div><div class="actions"><div class="workspace-tools"><select id="workspaceSelect" aria-label="בחירת חשבון" onchange="switchWorkspace(this.value)"></select></div><button onclick="backup()">↓ גיבוי נתונים</button><button class="primary" onclick="go('orders')">＋ הזמנה חדשה</button></div></header>
+<main><header class="top"><div><div class="eyebrow">TOMCHEI TORAH / DAAT AHARON</div><h1 id="pageTitle">לוח בקרה</h1><p id="pageSub">תמונת מצב עדכנית של ההזמנות שלך</p><div class="credit">תומכי תורה | ישיבת דעת אהרן בהנהלת הבה״ח יאיר חיימוביץ</div></div><div class="actions"><div class="workspace-tools"><select id="workspaceSelect" aria-label="בחירת חשבון" onchange="switchWorkspace(this.value)"></select></div><button onclick="backup()">↓ גיבוי נתונים</button><button class="primary" onclick="go('orders')">＋ הזמנה חדשה</button></div></header>
 <section id="dashboard" class="page">
 <div class="cards"><div class="card"><label>סה״כ פריטים שהוזמנו</label><strong id="statQty">0</strong><small>בכל ההזמנות</small></div><div class="card"><label>מספר הזמנות</label><strong id="statOrders">0</strong><small>רשומות פעילות</small></div><div class="card"><label>ממתינות לטיפול</label><strong id="statPending">0</strong><small>טרם נמסרו או בוטלו</small></div><div class="card"><label>הושלמו ונמסרו</label><strong id="statDone">0</strong><small>הזמנות שנמסרו</small></div></div><div class="cards"><div class="card"><label>מזמינים שונים</label><strong id="statPeople">0</strong><small>לפי שם המזמין</small></div><div class="card"><label>מוצרים מוגדרים</label><strong id="statProducts">0</strong><small>בקטלוג המוצרים</small></div><div class="card"><label>שווי הזמנות</label><strong id="statValue">₪0</strong><small>לפי מחירים שהוזנו</small></div><div class="card"><label>אספקות באיחור</label><strong id="statLate">0</strong><small>תאריך אספקה שעבר</small></div></div>
 <div class="grid2"><div class="panel"><div class="panel-head"><h2>הזמנות אחרונות</h2><button class="small" onclick="go('tracking')">לכל ההזמנות ←</button></div><div id="recent"></div></div><div class="panel"><div class="panel-head"><h2>כמויות לפי מוצר</h2><button class="small" onclick="go('summary')">לסיכום ←</button></div><div id="topProducts"></div></div></div>
