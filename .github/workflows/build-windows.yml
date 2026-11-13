@@ -25,6 +25,17 @@ jobs:
           cache: true
           cache-dependency-path: src/ClothingOrders/ClothingOrders.csproj
 
+      - name: Validate embedded JavaScript syntax
+        shell: pwsh
+        run: |
+          $html = Get-Content "src/ClothingOrders/wwwroot/index.html" -Raw
+          $match = [regex]::Match($html, '<script>([\s\S]*?)</script>')
+          if (-not $match.Success) { throw "Application JavaScript block was not found." }
+          $scriptPath = Join-Path $env:RUNNER_TEMP "application.js"
+          Set-Content -Path $scriptPath -Value $match.Groups[1].Value -NoNewline
+          node --check $scriptPath
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Publish self-contained Windows app
         run: dotnet publish src/ClothingOrders/ClothingOrders.csproj --configuration Release --runtime win-x64 --self-contained true --output publish
 
