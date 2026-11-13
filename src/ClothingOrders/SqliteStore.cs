@@ -74,13 +74,23 @@ internal sealed class SqliteStore : IDisposable
 
         using var transaction = _connection.BeginTransaction();
         var previous = ReadCurrentSnapshot(transaction);
-        if (IsValidJson(previous) && !string.Equals(previous, payload, StringComparison.Ordinal))
+        if (string.Equals(previous, payload, StringComparison.Ordinal))
+        {
+            transaction.Rollback();
+            return;
+        }
+
+        if (IsValidJson(previous))
         {
             using var history = _connection.CreateCommand();
             history.Transaction = transaction;
             history.CommandText = """
                 INSERT INTO snapshot_history(payload, created_utc)
-                VALUES ($payload, strftime('%Y-%m-%dT%H:%M:%fZ','now'));
+                SELECT $payload, strftime('%Y-%m-%dT%H:%M:%fZ','now')
+                WHERE NOT EXISTS (
+                    SELECT 1 FROM snapshot_history
+                    WHERE created_utc >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-5 minutes')
+                );
                 DELETE FROM snapshot_history
                 WHERE id NOT IN (
                     SELECT id FROM snapshot_history ORDER BY id DESC LIMIT 30
