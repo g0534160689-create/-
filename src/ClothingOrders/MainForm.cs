@@ -11,7 +11,7 @@ public sealed class MainForm : Form
 
     public MainForm()
     {
-        Text = "דעת אהרן | מערכת ניהול הזמנות לבוש";
+        Text = "תומכי תורה | ישיבת דעת אהרן";
         Width = 1440;
         Height = 940;
         MinimumSize = new Size(1050, 700);
