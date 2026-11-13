@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.IO.Compression;
+using System.Text;
 using Microsoft.Data.Sqlite;
 
 namespace ClothingOrders;
@@ -96,7 +98,7 @@ internal sealed class SqliteStore : IDisposable
                     SELECT id FROM snapshot_history ORDER BY id DESC LIMIT 30
                 );
                 """;
-            history.Parameters.AddWithValue("$payload", previous!);
+            history.Parameters.AddWithValue("$payload", EncodeSnapshot(previous!));
             history.ExecuteNonQuery();
         }
 
@@ -110,7 +112,7 @@ internal sealed class SqliteStore : IDisposable
                 updated_utc = excluded.updated_utc;
             """;
         save.Parameters.AddWithValue("$key", "webview-localstorage-v1");
-        save.Parameters.AddWithValue("$payload", payload);
+        save.Parameters.AddWithValue("$payload", EncodeSnapshot(payload));
         save.ExecuteNonQuery();
         transaction.Commit();
     }
@@ -121,7 +123,7 @@ internal sealed class SqliteStore : IDisposable
         command.Transaction = transaction;
         command.CommandText = "SELECT payload FROM app_state WHERE state_key = $key LIMIT 1;";
         command.Parameters.AddWithValue("$key", "webview-localstorage-v1");
-        return command.ExecuteScalar() as string;
+        return DecodeSnapshot(command.ExecuteScalar() as string);
     }
 
     private string? ReadLatestValidHistorySnapshot()
@@ -131,11 +133,44 @@ internal sealed class SqliteStore : IDisposable
         using var reader = command.ExecuteReader();
         while (reader.Read())
         {
-            var candidate = reader.GetString(0);
+            var candidate = DecodeSnapshot(reader.GetString(0));
             if (IsValidJson(candidate))
                 return candidate;
         }
         return null;
+    }
+
+    // Keep the database compact and reduce disk I/O for large multi-workspace snapshots.
+    // The prefix preserves compatibility with databases containing older plain-JSON rows.
+    private static string EncodeSnapshot(string value)
+    {
+        using var output = new MemoryStream();
+        using (var gzip = new GZipStream(output, CompressionLevel.Fastest, leaveOpen: true))
+        {
+            var bytes = Encoding.UTF8.GetBytes(value);
+            gzip.Write(bytes, 0, bytes.Length);
+        }
+        return "gzip:v1:" + Convert.ToBase64String(output.ToArray());
+    }
+
+    private static string? DecodeSnapshot(string? value)
+    {
+        if (string.IsNullOrEmpty(value) || !value.StartsWith("gzip:v1:", StringComparison.Ordinal))
+            return value;
+
+        try
+        {
+            var compressed = Convert.FromBase64String(value[8..]);
+            using var input = new MemoryStream(compressed);
+            using var gzip = new GZipStream(input, CompressionMode.Decompress);
+            using var output = new MemoryStream();
+            gzip.CopyTo(output);
+            return Encoding.UTF8.GetString(output.ToArray());
+        }
+        catch (Exception ex) when (ex is FormatException or InvalidDataException or IOException)
+        {
+            return null;
+        }
     }
 
     private static bool IsValidJson(string? value)
