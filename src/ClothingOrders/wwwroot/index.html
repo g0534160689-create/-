@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>תומכי תורה | ישיבת דעת אהרן</title>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <style>
 :root{--bg:#0b1220;--panel:#121d31;--panel2:#17243b;--line:#263752;--text:#edf3ff;--muted:#8fa2bf;--accent:#70a5ff;--accent2:#8c7cff;--green:#38c99a;--red:#ff7185;--shadow:0 18px 50px #0005}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 80% -10%,#203963 0,transparent 42%),var(--bg);color:var(--text);font-family:Arial,"Segoe UI",sans-serif;min-height:100vh}
@@ -117,7 +117,41 @@ function download(name,blob){let a=document.createElement('a'),u=URL.createObjec
 function exportCsv(){let rows=rowsOrders();if(!rows.length)return msg('אין נתונים לייצוא');let cols=Object.keys(rows[0]);let csv='\uFEFF'+[cols,...rows.map(r=>cols.map(c=>String(r[c]??'').replace(/"/g,'""')).map(v=>'"'+v+'"'))].map(r=>r.join(',')).join('\r\n');download('orders.csv',new Blob([csv],{type:'text/csv;charset=utf-8'}));msg('קובץ CSV הורד')}
 function exportOrders(){exportWorkbook([{name:'הזמנות',rows:rowsOrders()}],'orders')}
 function exportSummary(){let attrs=db.fields.filter(f=>f.enabled),groups={};db.orders.forEach(o=>{let key=[o.productId,...attrs.map(f=>o.attrs[f.id]||'—')].join('|');if(!groups[key])groups[key]={מוצר:productName(o.productId),...Object.fromEntries(attrs.map(f=>[f.name,o.attrs[f.id]||'—'])),כמות:0,'מספר הזמנות':0};groups[key].כמות+=Number(o.quantity);groups[key]['מספר הזמנות']++});exportWorkbook([{name:'סיכום כמויות',rows:Object.values(groups)},{name:'הזמנות',rows:rowsOrders()}],'summary')}
-function exportWorkbook(sheets,filename){if(!db.orders.length)return msg('אין נתונים לייצוא');if(window.XLSX){let wb=XLSX.utils.book_new();sheets.forEach(s=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(s.rows),s.name));XLSX.writeFile(wb,filename+'.xlsx');msg('קובץ Excel נוצר')}else{let rows=sheets[0].rows,cols=Object.keys(rows[0]||{});let csv='\uFEFF'+[cols,...rows.map(r=>cols.map(c=>r[c]??''))].map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');download(filename+'.csv',new Blob([csv],{type:'text/csv;charset=utf-8'}));msg('ספריית Excel אינה זמינה; הורד CSV שנפתח ב-Excel')}}
+let xlsxLoadPromise=null;
+function loadXlsxLibrary(){
+ if(window.XLSX)return Promise.resolve(true);
+ if(xlsxLoadPromise)return xlsxLoadPromise;
+ xlsxLoadPromise=new Promise(resolve=>{
+  const script=document.createElement('script');
+  script.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+  script.async=true;
+  script.onload=()=>resolve(!!window.XLSX);
+  script.onerror=()=>resolve(false);
+  document.head.appendChild(script);
+ });
+ return xlsxLoadPromise;
+}
+function exportAsCsv(sheets,filename){
+ const rows=sheets.flatMap((sheet,index)=>index?[[],[sheet.name],...sheet.rows]:sheet.rows);
+ const cols=Object.keys(rows.find(row=>row&&Object.keys(row).length)||{});
+ const csv='\uFEFF'+[cols,...rows.map(row=>cols.map(c=>row?.[c]??''))].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ download(filename+'.csv',new Blob([csv],{type:'text/csv;charset=utf-8'}));
+ msg('קובץ Excel לא זמין כרגע; הורד קובץ CSV שנפתח ב-Excel');
+}
+async function exportWorkbook(sheets,filename){
+ if(!db.orders.length)return msg('אין נתונים לייצוא');
+ const available=await loadXlsxLibrary();
+ if(available){
+  try{
+   const wb=XLSX.utils.book_new();
+   sheets.forEach(sheet=>XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(sheet.rows),sheet.name));
+   XLSX.writeFile(wb,filename+'.xlsx');
+   msg('קובץ Excel נוצר');
+   return;
+  }catch(error){console.error('Excel export failed',error)}
+ }
+ exportAsCsv(sheets,filename);
+}
 function backup(){persistWorkspaces();download('clothing-orders-backup.json',new Blob([JSON.stringify({format:'clothing-orders-backup-v2',workspaceName:workspaces.find(w=>w.id===activeWorkspaceId)?.name||'חשבון',data:db},null,2)],{type:'application/json'}));msg('גיבוי החשבון הפעיל הורד')}
 function restoreBackup(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{let x=JSON.parse(r.result);x=x.data||x;if(!Array.isArray(x.products)||!Array.isArray(x.fields)||!Array.isArray(x.orders))throw Error();if(!confirm('להחליף את הנתונים בחשבון הפעיל בנתוני הגיבוי?'))return;db=cleanData(x);audit('שחזור גיבוי','הנתונים הוחלפו מקובץ גיבוי');save();msg('הגיבוי שוחזר')}catch{msg('קובץ גיבוי לא תקין')}e.target.value=''};r.readAsText(f)}
 function clearAll(){if(!confirm('פעולה זו תמחק לצמיתות את כל המוצרים, השדות וההזמנות מהמחשב. להמשיך?'))return;db=structuredClone(defaults);save();msg('הנתונים נמחקו')}
@@ -148,7 +182,17 @@ function runDiagnostics(){const box=document.getElementById('diagnostics');if(!b
 function askSmart(q){document.getElementById('smartQuestion').value=q;runSmartQuery()}
 function runSmartQuery(){const input=document.getElementById('smartQuestion'),out=document.getElementById('smartAnswer'),q=(input.value||'').trim().toLowerCase();if(!q)return;const c=smartCounts();let html='';if(q.includes('תקינות')||q.includes('בדיקה')){runDiagnostics();html=document.getElementById('diagnostics').innerHTML}else if(q.includes('איחור')||q.includes('מאוחר')){html='<b>הזמנות באיחור: '+c.late.length+'</b><ul>'+c.late.slice(0,15).map(o=>'<li>'+esc(o.orderNo)+' · '+esc(o.customer)+' · '+esc(productName(o.productId))+' · יעד '+esc(o.dueDate)+'</li>').join('')+'</ul>'}else if(q.includes('מלאי')){html='<b>מצב מלאי</b><ul>'+db.stock.map(x=>'<li>'+esc(productName(x.productId))+': '+Number(x.quantity)+' יחידות (סף '+Number(x.minimum)+')'+(Number(x.quantity)<=Number(x.minimum)?' — נדרש חידוש':'')+'</li>').join('')+'</ul>'+(db.stock.length?'':'לא הוגדר מלאי עדיין')}else if(q.includes('מוצר')&&(q.includes('מבוקש')||q.includes('מוביל')||q.includes('פופולרי'))){const top=productSums()[0];html=top?'<b>המוצר המוביל:</b> '+esc(top.name)+' — '+top.qty+' פריטים':'אין עדיין הזמנות'}else if(q.includes('שווי')||q.includes('כסף')||q.includes('עלות')){html='<b>שווי ההזמנות הפעילות:</b> ₪'+c.value.toLocaleString('he-IL')+'<br>החישוב מבוסס על המחיר שהוזן בכל הזמנה.'}else if(q.includes('ממתינ')||q.includes('פתוח')){html='<b>הזמנות פעילות:</b> '+c.active.length+'<br><b>ממתינות למסירה:</b> '+c.active.filter(o=>o.status!=='נמסר').length}else if(q.includes('הזמנ')||q.includes('כמה')){html='<b>סך הזמנות:</b> '+db.orders.length+'<br><b>פריטים:</b> '+total()+'<br><b>מזמינים שונים:</b> '+new Set(db.orders.map(o=>o.customer.trim().toLowerCase())).size}else if(q.includes('דחופ')||q.includes('עדיפות')){html='<b>הזמנות בעדיפות גבוהה או דחופה: '+c.urgent.length+'</b><ul>'+c.urgent.slice(0,12).map(o=>'<li>'+esc(o.orderNo)+' · '+esc(o.customer)+' · '+esc(o.priority)+'</li>').join('')+'</ul>'}else{html='אין התאמה לשאלה. אפשר לשאול על הזמנות, איחורים, מלאי, מוצר מוביל, שווי או עדיפות.'}out.innerHTML=html}
 
-function renderAll(){renderWorkspaceSelectors();renderDashboard();renderSettings();renderOrderFields();renderSmartCenter();if(!tracking.classList.contains('hidden'))renderTracking();if(!customers.classList.contains('hidden'))renderCustomers();if(!summary.classList.contains('hidden'))renderSummary()}
+function renderAll(){
+ renderWorkspaceSelectors();
+ const activePage=document.querySelector('.page:not(.hidden)')?.id||'dashboard';
+ if(activePage==='dashboard')renderDashboard();
+ else if(activePage==='settings')renderSettings();
+ else if(activePage==='orders')renderOrderFields();
+ else if(activePage==='smart')renderSmartCenter();
+ else if(activePage==='tracking')renderTracking();
+ else if(activePage==='customers')renderCustomers();
+ else if(activePage==='summary')renderSummary();
+}
 
 function syncSqliteSnapshot(){try{if(window.chrome?.webview){const snapshot={};for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);snapshot[k]=localStorage.getItem(k)}window.chrome.webview.postMessage({type:'sqlite-snapshot',payload:JSON.stringify(snapshot)})}}catch(e){console.warn('SQLite sync unavailable',e)}}
 if(window.chrome?.webview){window.chrome.webview.addEventListener('message',event=>{try{const message=typeof event.data==='string'?JSON.parse(event.data):event.data;if(message==='__export_local_data__'){syncSqliteSnapshot();return}if(message?.type==='restore'&&typeof message.payload==='string'){const snapshot=JSON.parse(message.payload);if(snapshot&&typeof snapshot==='object'){Object.entries(snapshot).forEach(([k,v])=>{if(typeof v==='string')localStorage.setItem(k,v)});workspaces=loadWorkspaces();activeWorkspaceId=localStorage.getItem('clothing-orders-active-workspace')||workspaces[0].id;if(!workspaces.some(w=>w.id===activeWorkspaceId))activeWorkspaceId=workspaces[0].id;db=workspaces.find(w=>w.id===activeWorkspaceId).data;renderAll();go('dashboard');syncSqliteSnapshot()}}}catch(e){console.error('SQLite restore failed',e)}})}
