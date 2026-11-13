@@ -132,9 +132,19 @@ function loadXlsxLibrary(){
  return xlsxLoadPromise;
 }
 function exportAsCsv(sheets,filename){
- const rows=sheets.flatMap((sheet,index)=>index?[[],[sheet.name],...sheet.rows]:sheet.rows);
- const cols=Object.keys(rows.find(row=>row&&Object.keys(row).length)||{});
- const csv='\uFEFF'+[cols,...rows.map(row=>cols.map(c=>row?.[c]??''))].map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
+ const quote=value=>'"'+String(value??'').replace(/"/g,'""')+'"';
+ const lines=[];
+ sheets.forEach((sheet,index)=>{
+  if(index)lines.push('');
+  lines.push(quote(sheet.name));
+  const rows=Array.isArray(sheet.rows)?sheet.rows:[];
+  const cols=Object.keys(rows[0]||{});
+  if(cols.length){
+   lines.push(cols.map(quote).join(','));
+   rows.forEach(row=>lines.push(cols.map(col=>quote(row[col])).join(',')));
+  }
+ });
+ const csv='\uFEFF'+lines.join('\r\n');
  download(filename+'.csv',new Blob([csv],{type:'text/csv;charset=utf-8'}));
  msg('קובץ Excel לא זמין כרגע; הורד קובץ CSV שנפתח ב-Excel');
 }
