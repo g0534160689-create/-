@@ -10,6 +10,7 @@ public sealed class MainForm : Form
     private SqliteStore? _store;
     private TaskCompletionSource<bool>? _pendingSnapshotSave;
     private bool _allowClose;
+    private bool _closingInProgress;
 
     public MainForm()
     {
@@ -31,8 +32,11 @@ public sealed class MainForm : Form
     private async void HandleFormClosingAsync(object? sender, FormClosingEventArgs e)
     {
         if (_allowClose) return;
+        if (_closingInProgress) { e.Cancel = true; return; }
 
         e.Cancel = true;
+        _closingInProgress = true;
+        Enabled = false;
         try
         {
             if (_web.CoreWebView2 is not null && _store is not null)
@@ -52,6 +56,8 @@ public sealed class MainForm : Form
                     if (choice != DialogResult.Yes)
                     {
                         _pendingSnapshotSave = null;
+                        _closingInProgress = false;
+                        Enabled = true;
                         return;
                     }
                 }
@@ -69,6 +75,8 @@ public sealed class MainForm : Form
             if (choice != DialogResult.Yes)
             {
                 _pendingSnapshotSave = null;
+                _closingInProgress = false;
+                Enabled = true;
                 return;
             }
         }
