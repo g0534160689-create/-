@@ -137,21 +137,25 @@ public sealed class MainForm : Form
             if (!root.TryGetProperty("type", out var type) || type.GetString() != "sqlite-snapshot")
                 return;
             if (!root.TryGetProperty("payload", out var payload) || payload.ValueKind != JsonValueKind.String)
+            {
+                _pendingSnapshotSave?.TrySetException(new InvalidDataException("מבנה הודעת השמירה אינו תקין."));
                 return;
+            }
             var json = payload.GetString();
-            if (string.IsNullOrWhiteSpace(json) || json.Length > 50_000_000) return;
+            if (string.IsNullOrWhiteSpace(json) || json.Length > 50_000_000)
+            {
+                _pendingSnapshotSave?.TrySetException(new InvalidDataException("תוכן השמירה ריק או גדול מהמגבלה המותרת."));
+                return;
+            }
             _store.SaveSnapshot(json);
             _pendingSnapshotSave?.TrySetResult(true);
         }
-        catch (JsonException)
-        {
-            // Ignore malformed messages; the existing browser copy remains intact.
-        }
-        catch (Microsoft.Data.Sqlite.SqliteException ex)
+        catch (Exception ex)
         {
             _pendingSnapshotSave?.TrySetException(ex);
-            MessageBox.Show(this, "שמירת הנתונים למסד הנתונים נכשלה. מומלץ לייצא גיבוי.\n\n" + ex.Message,
-                "שגיאת שמירה", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            if (_pendingSnapshotSave is null)
+                MessageBox.Show(this, "שמירת הנתונים למסד הנתונים נכשלה. מומלץ לייצא גיבוי.\n\n" + ex.Message,
+                    "שגיאת שמירה", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
     }
 }
