@@ -35,7 +35,7 @@ jobs:
           Set-Content -Path $scriptPath -Value $match.Groups[1].Value -NoNewline
           node --check $scriptPath
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $requiredFeatures = @("function scheduleTrackingRender()", "const fieldIds=new Set()", "const workspaceIds=new Set()", "const supplierNames=new Set()", "function localDateKey(date=new Date())", "const existing=new Set(db.tasks.map(t=>t.sourceKey).filter(Boolean))", "הסריקה החכמה הושלמה", "function openGlobalSearch()", "function renderGlobalSearch()", "document.addEventListener('keydown'")
+          $requiredFeatures = @("function scheduleTrackingRender()", "const fieldIds=new Set()", "const workspaceIds=new Set()", "const supplierNames=new Set()", "function localDateKey(date=new Date())", "const existing=new Set(db.tasks.map(t=>t.sourceKey).filter(Boolean))", "הסריקה החכמה הושלמה", "function openGlobalSearch()", "function renderGlobalSearch()", "document.addEventListener('keydown'", "function renderActionQueue()", "actionQueue", "highOrUrgent")
           foreach ($feature in $requiredFeatures) {
             if (-not $html.Contains($feature)) { throw "Required management/performance feature missing: $feature" }
           }
